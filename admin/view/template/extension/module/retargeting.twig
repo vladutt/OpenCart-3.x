@@ -38,14 +38,13 @@
 
                 <!-- Sign up pop-up message -->
                 {% if module_retargeting_apikey is not defined and module_retargeting_apikey is empty %}
-                    <div class="alert alert-info"><i class="fa fa-info-circle"></i> {{ text_signup }}</div>
+                    <div class="alert alert-info"><i class="fa fa-info-circle"></i> {{ text_signup }}
+                        <button type="button" class="close" data-dismiss="alert">x</button>
+                    </div>
                 {% endif %}
 
                 <!-- Submission form -->
                 <form action="{{ action }}" method="post" enctype="multipart/form-data" id="form-retargeting" class="form-horizontal">
-                    <div class="alert alert-info"><i class="fa fa-info-circle"></i> {{ text_signup }}
-                      <button type="button" class="close" data-dismiss="alert">x</button>
-                    </div>
                     
                     <!-- API KEY -->
                     <div class="form-group">
