@@ -121,7 +121,10 @@
                     <div class="form-group">
                         <label class="col-sm-2 control-label" for="input-clickImage">{{ entry_image }}</label>
                         <div class="col-sm-10">
-                            <input type="text" name="module_retargeting_clickImage" value="{{ module_retargeting_clickImage is defined and module_retargeting_clickImage is not empty ? module_retargeting_clickImage : "a.thumbnail" }}" placeholder="a.thumbnail" id="input-clickImage" class="form-control" />
+                            <input type="text" name="module_retargeting_clickImage"
+                                   value="{{ module_retargeting_clickImage is defined and module_retargeting_clickImage is not empty ? module_retargeting_clickImage : "a.thumbnail" }}"
+                                   placeholder="a.thumbnail" id="input-clickImage" class="form-control"
+                            />
                             <span class="small">Main product image container query selector.</span>
                         </div>
                     </div>

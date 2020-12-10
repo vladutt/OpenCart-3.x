@@ -6,7 +6,7 @@
 */
 
 // Heading
-$_['heading_title']       = 'Retargeting Tracker';
+$_['heading_title']       = 'Retargeting Tracker 3.x+';
 
 // Text
 $_['text_extension']      = 'Extensions';
