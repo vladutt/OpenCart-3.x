@@ -1,4 +1,7 @@
 <?php
+
+require_once DIR_SYSTEM . 'library/retargeting/vendor/autoload.php';
+
 /**
   *  Retargeting Tracker for OpenCart 3.x
   *  @author Carol-Theodor Pelu
@@ -9,10 +12,27 @@ class ControllerExtensionModuleRetargeting extends Controller {
 
     private $error = array();
 
-    /*
-     *  Index method
+    /**
+     * ControllerExtensionModuleRetargeting constructor.
+     * @param $registry
      */
-    public function index() {
+    public function __construct($registry)
+    {
+        parent::__construct($registry);
+    }
+
+    /**
+     * Index method
+     * @throws Exception
+     */
+    public function index()
+    {
+        if(!empty($this->missingRequirements()))
+        {
+            $this->uninstall();
+
+            exit($this->missingRequirements());
+        }
 
         $this->load->language('extension/module/retargeting');
 
@@ -142,7 +162,18 @@ class ControllerExtensionModuleRetargeting extends Controller {
         $this->response->setOutput($this->load->view('extension/module/retargeting', $data));
     }
 
-    public function install() {
+    /**
+     * Install module
+     * @throws Exception
+     */
+    public function install()
+    {
+        if(!empty($this->missingRequirements()))
+        {
+            $this->uninstall();
+
+            exit($this->missingRequirements());
+        }
 
         $this->load->model('setting/event');
         $this->load->model('design/layout');
@@ -163,22 +194,125 @@ class ControllerExtensionModuleRetargeting extends Controller {
             'catalog/model/checkout/order/addOrderHistory/after',
             'extension/module/retargeting/eventAddOrderHistory'
         );
+
+        $this->model_setting_event->addEvent(
+            'retargeting_edit_product',
+            'admin/model/catalog/product/editProduct/after',
+            'extension/module/retargeting/model_edit_product_after'
+        );
+
+        $this->model_setting_event->addEvent(
+            'retargeting_delete_product',
+            'admin/model/catalog/product/deleteProduct/before',
+            'extension/module/retargeting/model_delete_product_before'
+        );
     }
 
-    public function uninstall() {
+    /**
+     * Call stock management api to update product real time
+     * @param $route
+     * @param $data
+     * @throws \Retargeting\Exceptions\RTGException
+     */
+    public function model_edit_product_after($route, $data)
+    {
+        if($data && isset($this->request->get['product_id']))
+        {
+            $product_id = $this->request->get['product_id'];
+            $baseUrl = $this->getBaseUrl();
+            $apiKey = $this->config->get('module_retargeting_token');
 
+            $product_info = $this->model_catalog_product->getProduct($product_id);
+
+            $productUrl = $this->url->link('product/product', 'product_id=' . $product_id);
+
+            $stock = new \RetargetingSDK\Api\StockManagement();
+
+            $stock->setProductId($product_id);
+            $stock->setName($product_info['name']);
+            $stock->setPrice($product_info['price']);
+            $stock->setPromo(isset($product_info['special']) && $product_info['special'] > 0 ? round($product_info['special'], 2) : 0);
+            $stock->setImage($baseUrl . 'image/' . $product_info['image']);
+            $stock->setUrl($productUrl);
+
+            (bool)$product_info['status'] && (int)$product_info['quantity'] > 0 ? $stock->setStock(true) : $stock->setStock(false);
+
+            $stock->updateStock($apiKey, $stock->prepareStockInfo());
+        }
+    }
+
+    /**
+     * Call stock management api to update product real time
+     *
+     * @param $route
+     * @param $data
+     * @throws \Retargeting\Exceptions\RTGException
+     */
+    public function model_delete_product_before($route, $data)
+    {
+        if(!empty($data) && isset($data[0]))
+        {
+            $this->load->model('catalog/product');
+
+            $product_id = (int)$data[0];
+            $baseUrl = $this->getBaseUrl();
+            $apiKey = $this->config->get('module_retargeting_token');
+
+            $product_info = $this->model_catalog_product->getProduct($product_id);
+
+            $productUrl = $this->url->link('product/product', 'product_id=' . $product_id);
+
+            $stock = new \RetargetingSDK\Api\StockManagement();
+
+            $stock->setProductId($product_id);
+            $stock->setName($product_info['name']);
+            $stock->setPrice($product_info['price']);
+            $stock->setPromo(isset($product_info['special']) && $product_info['special'] > 0 ? round($product_info['special'], 2) : 0);
+            $stock->setImage($baseUrl . 'image/' . $product_info['image']);
+            $stock->setUrl($productUrl);
+
+            (bool)$product_info['status'] && (int)$product_info['quantity'] > 0 ? $stock->setStock(true) : $stock->setStock(false);
+
+            $stock->updateStock($apiKey, $stock->prepareStockInfo());
+        }
+    }
+
+    /**
+     * Get shop url
+     * @return mixed
+     */
+    public function getBaseUrl()
+    {
+        if (isset($this->request->server['HTTPS']) && (($this->request->server['HTTPS'] == 'on') || ($this->request->server['HTTPS'] == '1'))) {
+            return $this->config->get('config_ssl');
+        }
+
+        return $this->config->get('config_url');
+    }
+
+    /**
+     * Uninstall module
+     */
+    public function uninstall()
+    {
         $this->load->model('design/layout');
         $this->load->model('setting/setting');
+        $this->load->model('setting/event');
 
         $this->db->query("DELETE FROM " . DB_PREFIX . "layout_module WHERE code = 'retargeting'");
+
         $this->model_setting_setting->deleteSetting('retargeting');
-        $this->model_setting_event->deleteEvent('retargeting');
+
+        $this->model_setting_event->deleteEventByCode('retargeting_add_order');
+        $this->model_setting_event->deleteEventByCode('retargeting_edit_product');
     }
 
-    /*
-     * Validate method
+    /**
+     * Validation method
+     * @return bool
      */
-    public function validate() {
+    public function validate()
+    {
         if (!$this->user->hasPermission('modify', 'extension/module/retargeting')) {
             $this->error['warning'] = $this->language->get('error_permission');
         }
@@ -197,5 +331,36 @@ class ControllerExtensionModuleRetargeting extends Controller {
         }
 
         return !$this->error;
+    }
+
+    /**
+     * Check is system fit rtg requirements
+     * @return string
+     */
+    private function missingRequirements()
+    {
+        $errors = [];
+        $contactYourWebAdmin = " in order to function. Please contact your web server administrator for assistance.";
+
+        if (true === version_compare(PHP_VERSION, '7.1', '<='))
+        {
+            $errors[] = 'Your PHP version is too old. The Retargeting plugin requires PHP 7.1 or higher'
+                .$contactYourWebAdmin . 'Your PHP version is currently ' . PHP_VERSION . '. ';
+        }
+
+        if (extension_loaded('json') === false)
+        {
+            $errors[] = 'The Retargeting plugin requires the JSON extension for PHP'.$contactYourWebAdmin;
+        }
+
+        if (false === extension_loaded('curl'))
+        {
+            $errors[] = 'The Retargeting plugin requires the Curl extension for PHP'.$contactYourWebAdmin;
+        }
+
+        if (!empty($errors))
+        {
+            return implode("<br>\n", $errors);
+        }
     }
 }
