@@ -273,7 +273,7 @@ class ControllerExtensionModuleRetargeting extends Controller
 
                 $setupProduct->setId($product['product_id']);
                 $setupProduct->setName($product['name']);
-                $setupProduct->setUrl(str_replace('amp;', '', $productUrl));
+                $setupProduct->setUrl(str_replace(['&amp;'," "], ['&',"%20"], $productUrl));
                 $setupProduct->setImg($productImage);
                 $setupProduct->setPrice(number_format($productPrice, 2, '.', ''));
                 $setupProduct->setPromo($productSpecialPrice > 0 ? number_format($productSpecialPrice, 2, '.', '') : 0);
@@ -450,7 +450,6 @@ class ControllerExtensionModuleRetargeting extends Controller
      */
     public function refactorCategories($categories) {
 
-
         $reCategories = [];
         foreach ($categories as $category) {
 
@@ -459,11 +458,11 @@ class ControllerExtensionModuleRetargeting extends Controller
             if (!isset($catalogCategory['name']) || empty($catalogCategory['name'])) {
                 continue;
             }
-            $reCategories[] = $catalogCategory['name'];
+            $reCategories[$category['category_id']] = $catalogCategory['name'];
 
         }
 
-        return implode(' | ', $reCategories);
+        return $reCategories;
 
     }
 
