@@ -269,8 +269,51 @@ class ControllerExtensionModuleRetargeting extends Controller
 
                 $productImage = str_replace(' ', '%20',$productImage);
 
-                $setupProduct =  new \RetargetingSDK\Product();
+                $extraData = [
+                    'media_gallery' => [],
+                    'variations' => [],
+                    'categories' => []
+                ];
 
+                $productCategories = $this->model_catalog_product->getCategories($product['product_id']);
+
+                foreach ($productCategories as $category) {
+
+                    $fullCategory = $this->model_catalog_category->getCategory($category['category_id']);
+                    $extraData['categories'][] = [$fullCategory['category_id'] => $fullCategory['name']];
+                }
+
+                $productImages = $this->model_catalog_product->getProductImages($product['product_id']);
+
+                foreach ($productImages as $image) {
+                    $extraData['media_gallery'][] = $this->config->get('config_url') . 'image/' . str_replace(' ', '%20', $image['image']);
+                }
+
+                $price = number_format($productPrice, 2, '.', '');
+                $promoPrice = $productSpecialPrice > 0 ? number_format($productSpecialPrice, 2, '.', '') : $price;
+
+                $options = $this->model_catalog_product->getProductOptions($product['product_id']);
+
+                foreach($options as $optionValue) {
+
+                    foreach ($optionValue['product_option_value'] as $option) {
+
+                        if (empty($option['price'])) {
+                            continue;
+                        }
+
+                        $extraData['variations'][] = [
+                            'code' => $option['name'],
+                            'price' => $option['price_prefix'] === '+' ? $price + $option['price'] : $price - $option['price'],
+                            'sale_price' => $option['price_prefix'] === '+' ? $promoPrice + $option['price'] : $promoPrice - $option['price'],
+                            'stock' => $option['quantity']
+                        ];
+
+                    }
+
+                }
+
+                $setupProduct =  new \RetargetingSDK\Product();
                 $setupProduct->setId($product['product_id']);
                 $setupProduct->setName($product['name']);
                 $setupProduct->setUrl(str_replace('amp;', '', $productUrl));
@@ -284,7 +327,7 @@ class ControllerExtensionModuleRetargeting extends Controller
                 $setupProduct->setCategory($productCategoryTree);
                 $setupProduct->setInventory($product['quantity']);
                 $setupProduct->setAdditionalImages($productAdditionalImages);
-                $setupProduct->setExtraData([]);
+                $setupProduct->setExtraData($extraData);
 
                 fputcsv($outstream, $setupProduct->getData(true, false), ',', '"');
 
