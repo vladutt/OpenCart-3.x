@@ -273,7 +273,7 @@ class ControllerExtensionModuleRetargeting extends Controller
 
                 $setupProduct->setId($product['product_id']);
                 $setupProduct->setName($product['name']);
-                $setupProduct->setUrl(str_replace(['&amp;'," "], ['&',"%20"], $productUrl));
+                $setupProduct->setUrl(str_replace(['amp;'," "], ['&',"%20"], $productUrl));
                 $setupProduct->setImg($productImage);
                 $setupProduct->setPrice(number_format($productPrice, 2, '.', ''));
                 $setupProduct->setPromo($productSpecialPrice > 0 ? number_format($productSpecialPrice, 2, '.', '') : 0);
