@@ -15,6 +15,8 @@ require_once DIR_SYSTEM . 'library/retargeting/vendor/autoload.php';
  */
 class ControllerExtensionModuleRetargeting extends Controller
 {
+
+    protected $replace = [['amp;'," "],['&',"%20"]];
     /**
      * @return mixed
      * @throws Exception
@@ -253,11 +255,26 @@ class ControllerExtensionModuleRetargeting extends Controller
                     $this->getManufacturedId(),
                     $this->getProductId()))->getProductImages((int)$product['product_id'], $baseUrl);
 
-                $extraData = $this->getExtraData([
-                    'categories' => $this->model_catalog_product->getCategories($product['product_id']),
-                    'product_id' => $product['product_id'],
-                    'base_url'   => $baseUrl
-                ]);
+                $extraData = [
+                    'media_gallery' => [],
+                    'variations' => [],
+                    'categories' => []
+                ];
+
+                $productCategories = $this->model_catalog_product->getCategories($product['product_id']);
+
+                foreach ($productCategories as $category) {
+
+                    $fullCategory = $this->model_catalog_category->getCategory($category['category_id']);
+                    $extraData['categories'][$category['category_id']] = $fullCategory['name'];
+                }
+
+                $productImages = $this->model_catalog_product->getProductImages($product['product_id']);
+
+                foreach ($productImages as $image) {
+
+                    $extraData['media_gallery'][] = $this->config->get('config_url') . 'image/' . str_replace(' ', '%20', $image['image']);
+                }
 
                 if (!empty($product['image'])) {
                     $productImage = $baseUrl . 'image/' . $product['image'];
@@ -267,7 +284,29 @@ class ControllerExtensionModuleRetargeting extends Controller
                     $productImage = $this->config->get('config_url') . 'image/no_image-40x40.png';
                 }
 
-                $productImage = str_replace(' ', '%20',$productImage);
+                $price = number_format($productPrice, 2, '.', '');
+                $promoPrice = $productSpecialPrice > 0 ? number_format($productSpecialPrice, 2, '.', '') : $price;
+
+                $options = $this->model_catalog_product->getProductOptions($product['product_id']);
+
+                foreach($options as $optionValue) {
+
+                    foreach ($optionValue['product_option_value'] as $option) {
+
+                        if (empty($option['price'])) {
+                            continue;
+                        }
+
+                        $extraData['variations'][] = [
+                            'code' => $option['name'],
+                            'price' => $option['price_prefix'] === '+' ? $price + $option['price'] : $price - $option['price'],
+                            'sale_price' => $option['price_prefix'] === '+' ? $promoPrice + $option['price'] : $promoPrice - $option['price'],
+                            'stock' => $option['quantity']
+                        ];
+
+                    }
+
+                }
 
                 $extraData = [
                     'media_gallery' => [],
@@ -316,10 +355,10 @@ class ControllerExtensionModuleRetargeting extends Controller
                 $setupProduct =  new \RetargetingSDK\Product();
                 $setupProduct->setId($product['product_id']);
                 $setupProduct->setName($product['name']);
-                $setupProduct->setUrl(str_replace('amp;', '', $productUrl));
-                $setupProduct->setImg($productImage);
-                $setupProduct->setPrice(number_format($productPrice, 2, '.', ''));
-                $setupProduct->setPromo($productSpecialPrice > 0 ? number_format($productSpecialPrice, 2, '.', '') : 0);
+                $setupProduct->setUrl( str_replace($this->replace[0], $this->replace[1], $productUrl) );
+                $setupProduct->setImg( str_replace($this->replace[0], $this->replace[1], $productImage) );
+                $setupProduct->setPrice($price);
+                $setupProduct->setPromo($promoPrice);
                 $setupProduct->setBrand(\RetargetingSDK\Helpers\BrandHelper::validate([
                     'id'    => $product['manufacturer_id'],
                     'name'  => $product['manufacturer']
@@ -493,7 +532,6 @@ class ControllerExtensionModuleRetargeting extends Controller
      */
     public function refactorCategories($categories) {
 
-
         $reCategories = [];
         foreach ($categories as $category) {
 
@@ -502,11 +540,11 @@ class ControllerExtensionModuleRetargeting extends Controller
             if (!isset($catalogCategory['name']) || empty($catalogCategory['name'])) {
                 continue;
             }
-            $reCategories[] = $catalogCategory['name'];
+            $reCategories[$category['category_id']] = $catalogCategory['name'];
 
         }
 
-        return implode(' | ', $reCategories);
+        return $reCategories;
 
     }
 
